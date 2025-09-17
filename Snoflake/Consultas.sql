@@ -1,0 +1,134 @@
+USE WAREHOUSE COMPUTE_WH;
+USE DATABASE TFM;
+USE SCHEMA COMPANIES;
+
+-------------------------------------
+-- =====================================================
+--  CONSULTAS BÁSICAS DE EXPLORACIÓN
+-- =====================================================
+--Ver todas las empresas de Spain y Colombia
+SELECT 
+    c.NAME as empresa,
+    co.NAME as pais,
+    ci.NAME as ciudad,
+    c.WEBSITE as sitio_web
+FROM TFM.COMPANIES.COMPANIES c
+JOIN TFM.COMPANIES.CITIES ci ON c.CITY_ID = ci.ID
+JOIN TFM.COMPANIES.COUNTRIES co ON ci.COUNTRY_ID = co.ID
+WHERE co.NAME IN ('Colombia', 'Spain')
+ORDER BY co.NAME, c.NAME;
+
+------------------------------------------------------
+--conteo de empresas
+SELECT 
+    CO.NAME AS PAIS,
+    COUNT(C.ID) AS TOTAL_EMPRESAS
+FROM TFM.COMPANIES.COMPANIES C
+LEFT JOIN TFM.COMPANIES.CITIES CI ON C.CITY_ID = CI.ID
+LEFT JOIN TFM.COMPANIES.COUNTRIES CO ON CI.COUNTRY_ID = CO.ID
+WHERE CO.NAME IN ('Colombia', 'Spain')
+GROUP BY CO.NAME
+ORDER BY TOTAL_EMPRESAS DESC;
+---------------------------------------
+-- =====================================================
+-- 2. ANÁLISIS POR SECTORES E INDUSTRIAS
+-- =====================================================
+
+--Distribucion de empresas por sector
+
+SELECT 
+    CO.NAME AS PAIS,
+    S.NAME AS SECTOR,
+    COUNT(C.ID) AS NUMERO_EMPRESAS,
+    ROUND((COUNT(C.ID) * 100.0 / SUM(COUNT(C.ID)) OVER (PARTITION BY CO.NAME)), 2) AS PORCENTAJE
+FROM TFM.COMPANIES.COMPANIES C
+LEFT JOIN TFM.COMPANIES.SECTORS S ON C.SECTOR_ID = S.ID
+LEFT JOIN TFM.COMPANIES.CITIES CI ON C.CITY_ID = CI.ID
+LEFT JOIN TFM.COMPANIES.COUNTRIES CO ON CI.COUNTRY_ID = CO.ID
+WHERE CO.NAME IN ('Colombia', 'Spain') AND S.NAME IS NOT NULL
+GROUP BY CO.NAME, S.NAME
+ORDER BY CO.NAME, NUMERO_EMPRESAS DESC;
+
+--------------------------------------------------------------------
+--Ingresos Promedio y Total por Industria
+SELECT 
+    CO.NAME AS PAIS,
+    I.NAME AS INDUSTRIA,
+    COUNT(C.ID) AS NUMERO_EMPRESAS,
+    ROUND(AVG(C.REVENUES), 2) AS INGRESOS_PROMEDIO,
+    SUM(C.REVENUES) AS INGRESOS_TOTALES
+FROM TFM.COMPANIES.COMPANIES C
+LEFT JOIN TFM.COMPANIES.INDUSTRIES I ON C.INDUSTRY_ID = I.ID
+LEFT JOIN TFM.COMPANIES.CITIES CI ON C.CITY_ID = CI.ID
+LEFT JOIN TFM.COMPANIES.COUNTRIES CO ON CI.COUNTRY_ID = CO.ID
+WHERE CO.NAME IN ('Colombia', 'Spain') AND C.REVENUES IS NOT NULL AND I.NAME IS NOT NULL
+GROUP BY CO.NAME, I.NAME
+ORDER BY CO.NAME, INGRESOS_TOTALES DESC;
+
+-------------------------------------------------------------------
+---Ver las primeras 10 empresas con más empleados
+SELECT 
+    c.NAME as empresa,
+    co.NAME as pais,
+    ci.NAME as ciudad,
+    c.EMPLOYEES as numero_empleados
+FROM TFM.COMPANIES.COMPANIES c
+JOIN TFM.COMPANIES.CITIES ci ON c.CITY_ID = ci.ID
+JOIN TFM.COMPANIES.COUNTRIES co ON ci.COUNTRY_ID = co.ID
+WHERE co.NAME IN ('Colombia', 'Spain')
+    AND c.EMPLOYEES IS NOT NULL
+ORDER BY c.EMPLOYEES DESC
+LIMIT 10;
+-----------------------------------------------------
+--Empresas por Sector e Industria
+SELECT 
+    CO.NAME AS PAIS,
+    S.NAME AS SECTOR,
+    I.NAME AS INDUSTRIA,
+    COUNT(C.ID) AS NUMERO_EMPRESAS,
+    SUM(C.EMPLOYEES) AS TOTAL_EMPLEADOS,
+    SUM(C.REVENUES) AS TOTAL_INGRESOS
+FROM TFM.COMPANIES.COMPANIES C
+LEFT JOIN TFM.COMPANIES.SECTORS S ON C.SECTOR_ID = S.ID
+LEFT JOIN TFM.COMPANIES.INDUSTRIES I ON C.INDUSTRY_ID = I.ID
+LEFT JOIN TFM.COMPANIES.CITIES CI ON C.CITY_ID = CI.ID
+LEFT JOIN TFM.COMPANIES.COUNTRIES CO ON CI.COUNTRY_ID = CO.ID
+WHERE CO.NAME IN ('Colombia', 'Spain') AND S.NAME IS NOT NULL
+GROUP BY CO.NAME, S.NAME, I.NAME
+ORDER BY CO.NAME, TOTAL_EMPLEADOS DESC;
+---------------------------------------------------------------
+--Tecnologías Más Usadas por País
+SELECT 
+    CO.NAME AS PAIS,
+    CS.TECH AS TECNOLOGIA,
+    COUNT(CS.COMPANY_ID) AS NUMERO_EMPRESAS
+FROM TFM.COMPANIES.COMPANY_STACKS CS
+JOIN TFM.COMPANIES.COMPANIES C ON CS.COMPANY_ID = C.ID
+LEFT JOIN TFM.COMPANIES.CITIES CI ON C.CITY_ID = CI.ID
+LEFT JOIN TFM.COMPANIES.COUNTRIES CO ON CI.COUNTRY_ID = CO.ID
+WHERE CO.NAME IN ('Colombia', 'Spain')
+GROUP BY CO.NAME, CS.TECH
+ORDER BY CO.NAME, NUMERO_EMPRESAS DESC
+LIMIT 50;
+-- =====================================================
+--  ANÁLISIS DE TIPOS DE COMPAÑÍA
+-- =====================================================
+----------------------------------------------
+--  Empresas públicas vs privadas
+SELECT 
+    co.NAME as pais,
+    ct.NAME as tipo_compania,
+    COUNT(*) as numero_empresas,
+    ROUND(AVG(c.REVENUES), 0) as promedio_ingresos,
+    ROUND(AVG(c.EMPLOYEES), 0) as promedio_empleados
+FROM TFM.COMPANIES.COMPANIES c
+JOIN TFM.COMPANIES.CITIES ci ON c.CITY_ID = ci.ID
+JOIN TFM.COMPANIES.COUNTRIES co ON ci.COUNTRY_ID = co.ID
+LEFT JOIN TFM.COMPANIES.COMPANY_TYPES ct ON c.COMPANY_TYPE_ID = ct.ID
+WHERE co.NAME IN ('Colombia', 'Spain')
+    AND c.REVENUES IS NOT NULL
+    AND c.EMPLOYEES IS NOT NULL
+GROUP BY co.NAME, ct.NAME
+ORDER BY co.NAME, numero_empresas DESC;
+
+
